@@ -1,15 +1,14 @@
-// light shader.cpp
-//based on code from Dr Paul Robertson
-#include "lightshader.h"
+// texture shader.cpp
+#include "shadowshader.h"
 
 
-LightShader::LightShader(ID3D11Device* device, HWND hwnd) : BaseShader(device, hwnd)
+ShadowShader::ShadowShader(ID3D11Device* device, HWND hwnd) : BaseShader(device, hwnd)
 {
-	InitShader(L"../shaders/light_vs.hlsl", L"../shaders/light_ps.hlsl");
+	InitShader(L"../shaders/shadow_vs.hlsl", L"../shaders/shadow_ps.hlsl");
 }
 
 
-LightShader::~LightShader()
+ShadowShader::~ShadowShader()
 {
 	// Release the sampler state.
 	if (m_sampleState)
@@ -33,10 +32,16 @@ LightShader::~LightShader()
 	}
 
 	// Release the light constant buffer.
-	if (m_lightBuffer)
+	if (m_LightBuffer)
 	{
-		m_lightBuffer->Release();
-		m_lightBuffer = 0;
+		m_LightBuffer->Release();
+		m_LightBuffer = 0;
+	}
+	// Release the light constant buffer.
+	if (m_LightBuffer2)
+	{
+		m_LightBuffer2->Release();
+		m_LightBuffer2 = 0;
 	}
 
 	//Release base shader components
@@ -44,12 +49,12 @@ LightShader::~LightShader()
 }
 
 
-void LightShader::InitShader(WCHAR* vsFilename, WCHAR* psFilename)
+void ShadowShader::InitShader(WCHAR* vsFilename, WCHAR* psFilename)
 {
 	D3D11_BUFFER_DESC matrixBufferDesc;
 	D3D11_SAMPLER_DESC samplerDesc;
 	D3D11_BUFFER_DESC lightBufferDesc;
-	D3D11_BUFFER_DESC colourBufferDesc;
+	D3D11_BUFFER_DESC lightBufferDesc2;
 
 	// Load (+ compile) shader files
 	loadVertexShader(vsFilename);
@@ -84,6 +89,14 @@ void LightShader::InitShader(WCHAR* vsFilename, WCHAR* psFilename)
 	// Create the texture sampler state.
 	m_device->CreateSamplerState(&samplerDesc, &m_sampleState);
 
+	// Required a CLAMPED sampler for sampling the depth map
+	samplerDesc.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+	samplerDesc.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+	samplerDesc.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+	// Create the texture sampler state.
+	m_device->CreateSamplerState(&samplerDesc, &m_sampleStateClamp);
+
+
 	// Setup light buffer
 	// Setup the description of the light dynamic constant buffer that is in the pixel shader.
 	// Note that ByteWidth always needs to be a multiple of 16 if using D3D11_BIND_CONSTANT_BUFFER or CreateBuffer will fail.
@@ -95,33 +108,32 @@ void LightShader::InitShader(WCHAR* vsFilename, WCHAR* psFilename)
 	lightBufferDesc.StructureByteStride = 0;
 
 	// Create the constant buffer pointer so we can access the vertex shader constant buffer from within this class.
-	m_device->CreateBuffer(&lightBufferDesc, NULL, &m_lightBuffer);
-	
-	// Setup colour buffer
-	// Setup the description of the colour dynamic constant buffer that is in the pixel shader.
-	// Note that ByteWidth always needs to be a multiple of 16 if using D3D11_BIND_CONSTANT_BUFFER or CreateBuffer will fail.
-	colourBufferDesc.Usage = D3D11_USAGE_DYNAMIC;
-	colourBufferDesc.ByteWidth = sizeof(colourBufferType);
-	colourBufferDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	colourBufferDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-	colourBufferDesc.MiscFlags = 0;
-	colourBufferDesc.StructureByteStride = 0;
+	m_device->CreateBuffer(&lightBufferDesc, NULL, &m_LightBuffer);
 
-	// Create the constant buffer pointer so we can access the vertex shader constant buffer from within this class.
-	m_device->CreateBuffer(&colourBufferDesc, NULL, &m_colourBuffer);
+	// Setup the description of the camera dynamic constant buffer that is in the vertex shader.
+	lightBufferDesc2.Usage = D3D11_USAGE_DYNAMIC;
+	lightBufferDesc2.ByteWidth = sizeof(LightBufferType2);
+	lightBufferDesc2.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	lightBufferDesc2.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+	lightBufferDesc2.MiscFlags = 0;
+	lightBufferDesc2.StructureByteStride = 0;
+
+	// Create the camera constant buffer pointer so we can access the vertex shader constant buffer from within this class.
+	m_device->CreateBuffer(&lightBufferDesc2, NULL, &m_LightBuffer2);
+
 }
 
 
-void LightShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX &worldMatrix, const XMMATRIX &viewMatrix, const XMMATRIX &projectionMatrix,
-									  ID3D11ShaderResourceView* texture, vector<Light*> light, XMFLOAT4 cutoffs, XMFLOAT4* colourValues)
+void ShadowShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX &worldMatrix, const XMMATRIX &viewMatrix, const XMMATRIX &projectionMatrix, ID3D11ShaderResourceView* texture, 
+										ID3D11ShaderResourceView* depthMapOne, ID3D11ShaderResourceView* depthMapTwo, ID3D11ShaderResourceView* depthMapThree, vector<Light*> light)
 {
 	HRESULT result;
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
 	MatrixBufferType* dataPtr;
 	LightBufferType* lightPtr;
-	colourBufferType* colourPtr;
+	LightBufferType2* lightPtr2;
 	unsigned int bufferNumber;
-	XMMATRIX tworld, tview, tproj;
+	XMMATRIX tworld, tview, tproj, tLightViewMatrix, tLightProjectionMatrix;
 
 
 	// Transpose the matrices to prepare them for the shader.
@@ -139,7 +151,16 @@ void LightShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const 
 	dataPtr->world = tworld;// worldMatrix;
 	dataPtr->view = tview;
 	dataPtr->projection = tproj;
+	
+	//sets light transformation matrices
+	for (int lightNumber = 0; lightNumber < light.size(); lightNumber++)
+	{
 
+		tLightViewMatrix = XMMatrixTranspose(light.at(lightNumber)->GetViewMatrix());
+		tLightProjectionMatrix = XMMatrixTranspose(light.at(lightNumber)->GetProjectionMatrix());
+		dataPtr->lightView[lightNumber] = tLightViewMatrix;
+		dataPtr->lightProjection[lightNumber] = tLightProjectionMatrix;
+	}
 	// Unlock the constant buffer.
 	deviceContext->Unmap(m_matrixBuffer, 0);
 
@@ -151,59 +172,41 @@ void LightShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const 
 
 	//Additional
 	// Send light data to pixel shader
-	deviceContext->Map(m_lightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-	lightPtr = (LightBufferType*)mappedResource.pData;
-	for (int currentIndex = 0; currentIndex < light.size(); currentIndex++)
+	for (int lightNumber = 0; lightNumber < light.size(); lightNumber++)
 	{
-		lightPtr->diffuse[currentIndex] = light.at(currentIndex)->GetDiffuseColour();
-		lightPtr->ambient[currentIndex] = light.at(currentIndex)->GetAmbientColour();
-		if (currentIndex == 0)
-		{
-
-			// Invert the light direction for calculations.
-			lightPtr->lightPositionOne = light.at(currentIndex)->GetPosition();
-		}
-		else if (currentIndex == 1)
-		{
-			// Invert the light direction for calculations.
-			lightPtr->lightPositionTwo = light.at(currentIndex)->GetPosition();
-		}
-		else
-		{
-			// Invert the light direction for calculations.
-			lightPtr->lightPositionThree = light.at(currentIndex)->GetPosition();
-		}
+		deviceContext->Map(m_LightBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+		lightPtr = (LightBufferType*)mappedResource.pData;
+		lightPtr->ambient[lightNumber] = light.at(lightNumber)->GetAmbientColour();
+		lightPtr->diffuse[lightNumber] = light.at(lightNumber)->GetDiffuseColour();
 	}
 
-	
-	
-	deviceContext->Unmap(m_lightBuffer, 0);
+	deviceContext->Unmap(m_LightBuffer, 0);
 	bufferNumber = 0;
-	deviceContext->PSSetConstantBuffers(bufferNumber, 1, &m_lightBuffer);
-	bufferNumber++;
+	deviceContext->PSSetConstantBuffers(bufferNumber, 1, &m_LightBuffer);
 
-	//map and set m_colourBuffer
-	deviceContext->Map(m_colourBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
-	colourPtr = (colourBufferType*)mappedResource.pData;
+	// Send light data to vertex shader
+	deviceContext->Map(m_LightBuffer2, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
+	lightPtr2 = (LightBufferType2*)mappedResource.pData;
+	lightPtr2->positionOne = light.at(0)->GetPosition();
+	lightPtr2->positionTwo = light.at(1)->GetPosition();
+	lightPtr2->positionThree = light.at(2)->GetPosition();
+	deviceContext->Unmap(m_LightBuffer2, 0);
+	bufferNumber = 1;
+	deviceContext->VSSetConstantBuffers(bufferNumber, 1, &m_LightBuffer2);
 
-	colourPtr->lightCutoffs = cutoffs;
-	colourPtr->lightColours[0] = colourValues[0];
-	colourPtr->lightColours[1] = colourValues[1];
-	colourPtr->lightColours[2] = colourValues[2];
-	colourPtr->lightColours[3] = colourValues[3];
-	
-	deviceContext->Unmap(m_colourBuffer, 0);
-
-	deviceContext->PSSetConstantBuffers(bufferNumber, 1, &m_colourBuffer);
-	
 	// Set shader texture resource in the pixel shader.
 	deviceContext->PSSetShaderResources(0, 1, &texture);
+	// Set shader depth maps texture resource.
+	deviceContext->PSSetShaderResources(1, 1, &depthMapOne);
+	deviceContext->PSSetShaderResources(2, 1, &depthMapTwo);
+	deviceContext->PSSetShaderResources(3, 1, &depthMapThree);
 }
 
-void LightShader::Render(ID3D11DeviceContext* deviceContext, int indexCount)
+void ShadowShader::Render(ID3D11DeviceContext* deviceContext, int indexCount)
 {
 	// Set the sampler state in the pixel shader.
 	deviceContext->PSSetSamplers(0, 1, &m_sampleState);
+	deviceContext->PSSetSamplers(1, 1, &m_sampleStateClamp);
 
 	// Base render function.
 	BaseShader::Render(deviceContext, indexCount);

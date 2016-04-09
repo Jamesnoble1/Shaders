@@ -1,10 +1,10 @@
 // Mesh.cpp
 #include "pointmesh.h"
 
-PointMesh::PointMesh(ID3D11Device* device, WCHAR* textureFilename)
+PointMesh::PointMesh(ID3D11Device* device, WCHAR* textureFilename, int triPoints)
 {
 	// Initialize the vertex and index buffer that hold the geometry for the triangle.
-	InitBuffers(device);
+	InitBuffers(device, triPoints);
 
 	// Load the texture for this model.
 	LoadTexture(device, textureFilename);
@@ -18,8 +18,11 @@ PointMesh::~PointMesh()
 }
 
 
-
 void PointMesh::InitBuffers(ID3D11Device* device)
+{
+}
+
+void PointMesh::InitBuffers(ID3D11Device* device, int triPoints)
 {
 	VertexType* vertices;
 	unsigned long* indices;
@@ -27,10 +30,10 @@ void PointMesh::InitBuffers(ID3D11Device* device)
 	D3D11_SUBRESOURCE_DATA vertexData, indexData;
 
 	// Set the number of vertices in the vertex array.
-	m_vertexCount = 3;
+	m_vertexCount = triPoints;
 
 	// Set the number of indices in the index array.
-	m_indexCount = 3;
+	m_indexCount = triPoints;
 
 	// Create the vertex array.
 	vertices = new VertexType[m_vertexCount];
@@ -39,22 +42,28 @@ void PointMesh::InitBuffers(ID3D11Device* device)
 	indices = new unsigned long[m_indexCount];
 
 	// Load the vertex array with data.
-	vertices[0].position = XMFLOAT3(0.0f, 1.0f, 0.0f);  // Top.
-	vertices[0].texture = XMFLOAT2(0.0f, 1.0f);
-	vertices[0].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	for (int i = 0; i < triPoints; i += 3)
+	{
+		vertices[i].position = XMFLOAT3(i, 1.0f, 0.0f);  // Top.
+		vertices[i].texture = XMFLOAT2(0.0f, 1.0f);
+		vertices[i].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
 
-	vertices[1].position = XMFLOAT3(-1.0f, 0.0f, 0.0f);  // Bottom left.
-	vertices[1].texture = XMFLOAT2(0.0f, 0.0f);
-	vertices[1].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+		vertices[i + 1].position = XMFLOAT3(i, 1.3f, 0.0f);  // Bottom left.
+		vertices[i + 1].texture = XMFLOAT2(0.0f, 0.0f);
+		vertices[i + 1].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
 
-	vertices[2].position = XMFLOAT3(1.0f, 0.0f, 0.0f);  // Bottom right.
-	vertices[2].texture = XMFLOAT2(1.0f, 0.0f);
-	vertices[2].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+		vertices[i + 2].position = XMFLOAT3(i, 1.6f, 0.0f);  // Bottom right.
+		vertices[i + 2].texture = XMFLOAT2(1.0f, 0.0f);
+		vertices[i + 2].normal = XMFLOAT3(0.0f, 0.0f, -1.0f);
+	}
+	
 
 	// Load the index array with data.
-	indices[0] = 0;  // Top/
-	indices[1] = 1;  // Bottom left.
-	indices[2] = 2;  // Bottom right.
+	for (int i = 0; i < triPoints; i++)
+	{
+		indices[i] = i;
+	}
+
 
 	// Set up the description of the static vertex buffer.
 	vertexBufferDesc.Usage = D3D11_USAGE_DEFAULT;

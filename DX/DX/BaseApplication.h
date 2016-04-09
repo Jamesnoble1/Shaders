@@ -10,19 +10,7 @@ const float SCREEN_DEPTH = 200.0f;	// 1000.0f
 const float SCREEN_NEAR = 0.1f;		//0.1f
 #define MOUSE_DEADZONE 10
 
-enum DisplayState{
-	START,
-	MOUNTAINS,
-	LIGHTING
-};
 
-enum ColourFilter{
-	NONE,
-	GREYSCALE,
-	NO_RED,
-	NO_BLUE,
-	NO_GREEN
-};
 
 // Includes
 #include "input.h"
@@ -42,7 +30,7 @@ public:
 protected:
 	virtual void HandleInput(float);
 	virtual bool Render() = 0;
-	void setCamera(DisplayState newState);
+	
 
 protected:
 	Input* m_Input;
@@ -52,8 +40,7 @@ protected:
 	RECT windowRect;
 	RECT screenRect;
 	float tesselationFactor;
-	DisplayState currentState;
-	ColourFilter currentFilter;
+	
 	bool showOptions;
 	bool shouldBlur;
 	bool isHighBlur;

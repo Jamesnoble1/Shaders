@@ -25,7 +25,7 @@
     <Filter Include="Source Files\Shaders\shaders">
       <UniqueIdentifier>{a6380955-4777-4cb6-9433-492d43ffce67}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\Applications">
+    <Filter Include="Applications">
       <UniqueIdentifier>{e2052eed-0665-4425-a274-e1d27c576dfe}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
@@ -97,7 +97,7 @@
       <Filter>Source Files\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="Project.cpp">
-      <Filter>Source Files\Applications</Filter>
+      <Filter>Applications</Filter>
     </ClCompile>
     <ClCompile Include="TessellationShader.cpp">
       <Filter>Source Files\Shaders</Filter>
@@ -116,6 +116,24 @@
     </ClCompile>
     <ClCompile Include="LightShader.cpp">
       <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="DepthShader.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="ShadowShader.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="GeometryShader.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="chromaKey.cpp">
+      <Filter>Source Files\Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="Terrain.cpp">
+      <Filter>Source Files\Geometry</Filter>
+    </ClCompile>
+    <ClCompile Include="TerrainGenerator.cpp">
+      <Filter>Source Files\Geometry</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -183,7 +201,7 @@
       <Filter>Source Files\Geometry</Filter>
     </ClInclude>
     <ClInclude Include="Project.h">
-      <Filter>Source Files\Applications</Filter>
+      <Filter>Applications</Filter>
     </ClInclude>
     <ClInclude Include="TessellationShader.h">
       <Filter>Source Files\Shaders</Filter>
@@ -202,6 +220,24 @@
     </ClInclude>
     <ClInclude Include="LightShader.h">
       <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="DepthShader.h">
+      <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="ShadowShader.h">
+      <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="GeometryShader.h">
+      <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="chromaKey.h">
+      <Filter>Source Files\Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="Terrain.h">
+      <Filter>Source Files\Geometry</Filter>
+    </ClInclude>
+    <ClInclude Include="TerrainGenerator.h">
+      <Filter>Source Files\Geometry</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -230,12 +266,6 @@
       <Filter>Source Files\Shaders\shaders</Filter>
     </FxCompile>
     <FxCompile Include="..\shaders\texture_vs.hlsl">
-      <Filter>Source Files\Shaders\shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\shaders\boxBlur_ps.hlsl">
-      <Filter>Source Files\Shaders\shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="..\shaders\boxBlur_vs.hlsl">
       <Filter>Source Files\Shaders\shaders</Filter>
     </FxCompile>
     <FxCompile Include="..\shaders\horizontalBlur_ps.hlsl">
@@ -278,6 +308,15 @@
       <Filter>Source Files\Shaders\shaders</Filter>
     </FxCompile>
     <FxCompile Include="..\shaders\light_vs.hlsl">
+      <Filter>Source Files\Shaders\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\shaders\depth_ps.hlsl">
+      <Filter>Source Files\Shaders\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\shaders\depth_vs.hlsl">
+      <Filter>Source Files\Shaders\shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="..\shaders\chroma_key_ps.hlsl">
       <Filter>Source Files\Shaders\shaders</Filter>
     </FxCompile>
   </ItemGroup>

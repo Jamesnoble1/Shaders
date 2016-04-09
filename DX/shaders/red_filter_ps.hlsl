@@ -16,6 +16,7 @@ float4 main(InputType input) : SV_TARGET
 
 	tempColour = shaderTexture.Sample(SampleType, input.tex);
 
+	//removes all red
 	tempColour.r = 0;
 	
 	return tempColour;

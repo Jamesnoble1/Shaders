@@ -2,80 +2,74 @@
 
 Project::Project(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeight, Input *in) : BaseApplication(hinstance, hwnd, screenWidth, screenHeight, in)
 {
-	// Create Mesh object
-	//creates terain mesh
-	terrainMesh = new TessellationMesh(m_Direct3D->GetDevice(), L"../res/mountainTex.png", L"../res/mountainDispMap.png");
+	lockMovement = true;
 
-	//create ortho mesh for options menu
-	optionsMenu = new OrthoMesh(m_Direct3D->GetDevice(), 200, 200, L"../res/options.png");
+	Light* tempLight;
 
-	//full screen orth mesh with no texture for post processing
-	postProcess = new OrthoMesh(m_Direct3D->GetDevice(), screenWidth, screenHeight);
+	//set up main directional light
+	tempLight = new Light;
+	tempLight->SetAmbientColour(0.5f, 0.50f, 0.5f, 1.0f);
+	tempLight->SetDiffuseColour(0.8f, 0.8f, 0.8f, 1.0f);
+	tempLight->SetPosition(1.0f, 1.0f, 1.0f);
+	tempLight->SetDirection(1.0f, -1.0f, 1.0f);
+	lights.push_back(tempLight);
 
-	//lighting meshes
-	//different sphere meshes as will have different textures. Otherwise would have translated same sphere
-	firstSphere = new SphereMesh(m_Direct3D->GetDevice(), L"../res/colour test.png", 50);
-	secondSphere = new SphereMesh(m_Direct3D->GetDevice(), L"../res/colour test.png");
-	thirdSphere = new SphereMesh(m_Direct3D->GetDevice(), L"../res/colour test.png");
-	//Cube for podium
-	podiumCube = new CubeMesh(m_Direct3D->GetDevice(), L"../res/brick1.dds");
-	//plane for ground
-	groundMesh = new PlaneMesh(m_Direct3D->GetDevice(), L"../res/bunny.png");
-
-	//create shader objects
-	testAlationShader = new TessellationShader(m_Direct3D->GetDevice(), hwnd);
-	textureShader = new TextureShader(m_Direct3D->GetDevice(), hwnd);
-	horizontalBlurShader = new HorizontalBlurShader(m_Direct3D->GetDevice(), hwnd);
-	vertBlurShader = new VerticalBlurShader(m_Direct3D->GetDevice(), hwnd);
-	greyScaleFilter = new ColourFilterShader(m_Direct3D->GetDevice(), hwnd, L"../shaders/grey_scale_ps.hlsl");
+	//spotlight one
+	tempLight = new Light;
+	tempLight->SetAmbientColour(0.0f, 0.0f, 0.0f, 1.0f);
+	tempLight->SetDiffuseColour(0.5f, 0.5f, 0.5f, 0.5f);
+	tempLight->SetPosition(1.0f, 1.0f, 1.0f);
+	tempLight->SetDirection(1.0f, -1.0f, 1.0f);
+	lights.push_back(tempLight);
 	
-	//filters set the appropriate channel to 0 
-	redFilter = new ColourFilterShader(m_Direct3D->GetDevice(), hwnd, L"../shaders/red_filter_ps.hlsl");
-	greenFilter = new ColourFilterShader(m_Direct3D->GetDevice(), hwnd, L"../shaders/green_filter_ps.hlsl");
-	blueFilter = new ColourFilterShader(m_Direct3D->GetDevice(), hwnd, L"../shaders/blue_filter_ps.hlsl");
-
-	//render to textures
-	initialScene = new RenderTexture(m_Direct3D->GetDevice(), screenWidth, screenHeight, SCREEN_NEAR, SCREEN_DEPTH);
-	downSample = new RenderTexture(m_Direct3D->GetDevice(), screenWidth / 2, screenHeight / 2, SCREEN_NEAR, SCREEN_DEPTH);
-	horizBlur = new RenderTexture(m_Direct3D->GetDevice(), screenWidth / 2, screenHeight / 2, SCREEN_NEAR, SCREEN_DEPTH);
-	vertBlur = new RenderTexture(m_Direct3D->GetDevice(), screenWidth / 2, screenHeight / 2, SCREEN_NEAR, SCREEN_DEPTH);
-	upSample = new RenderTexture(m_Direct3D->GetDevice(), screenWidth, screenHeight, SCREEN_NEAR, SCREEN_DEPTH);
-
-	//stores wcreen width and height
-	this->screenWidth = screenWidth;
-	this->screenHeight = screenHeight;
+	//spotlight two
+	tempLight = new Light;
+	tempLight->SetAmbientColour(0.0f, 0.0f, 0.0f, 1.0f);
+	tempLight->SetDiffuseColour(0.5f, 0.5f, 0.5f, 0.5f);
+	tempLight->SetPosition(50.0f, 1.0f, 10.0f);
+	tempLight->SetDirection(1.0f, -1.0f, 1.0f);
+	lights.push_back(tempLight);
 	
+	terrainGenerator = new TerrainGenerator(8, 0.6f);
+	terrainGenerator->calculateTerrain(5.0f, -3.0f, -5.0f, 2.0f); 
+	test = new Terrain(m_Direct3D->GetDevice(), L"../res/bunny.png", terrainGenerator->getTerrain(), terrainGenerator->getArraySize());
+	
+	testShader = new LightShader(m_Direct3D->GetDevice(), hwnd);
+
+
 }
-
-
 Project::~Project()
 {
+	delete terrainGenerator;
+	delete test;
+	delete testShader;
+
+	for (int i = 0; i < lights.size(); i++)
+	{
+		delete lights.at(i);
+	}
 	// Run base application deconstructor
 	BaseApplication::~BaseApplication();
-
-	// Release the Direct3D object.
-	if (terrainMesh)
-	{
-		delete terrainMesh;
-	}
-
-	if (testAlationShader)
-	{
-		delete testAlationShader;
-		
-	}
 }
+
 
 
 bool Project::Frame()
 {
 	bool result;
 
-	result = BaseApplication::Frame();
-	if (!result)
+	// Update the system stats.
+	m_Timer->Frame();
+
+	// Check if the user pressed escape and wants to exit the application.
+	if (m_Input->isKeyDown(VK_ESCAPE) == true)
 	{
 		return false;
 	}
+
+	// Do the frame input processing.
+	HandleInput(m_Timer->GetTime());
+
 
 	// Render the graphics.
 	result = Render();
@@ -93,7 +87,7 @@ bool Project::Render()
 	//matrices used by most functions, declared here as tend to not align properly when created at class instantiation
 	XMMATRIX worldMatrix, viewMatrix, projectionMatrix, baseVeiwMatrix, orthoMatrix;
 	// Clear the scene. 
-	m_Direct3D->BeginScene(0.0f, 0.0f, 0.0f, 1.0f);
+	m_Direct3D->BeginScene(0.2f, 0.2f, 0.8f, 1.0f);
 
 	// Generate the view matrix based on the camera's position.
 	m_Camera->Update();
@@ -105,271 +99,136 @@ bool Project::Render()
 	m_Camera->GetBaseViewMatrix(baseVeiwMatrix);
 	m_Direct3D->GetOrthoMatrix(orthoMatrix);
 	
+	XMMATRIX tempWorld = worldMatrix;
+	worldMatrix *= XMMatrixScaling(0.5f, 0.5f, 0.5f);
+	//terrain
+	test->SendData(m_Direct3D->GetDeviceContext());
+	XMFLOAT4 testColours[4] = { XMFLOAT4(1.0f, 1.0f, 1.0f, 1.0f), XMFLOAT4(0.6f, 0.4f, 0.2f, 1.0f), XMFLOAT4(0.0f, 0.5f, 0.0f, 1.0f) , XMFLOAT4(0.01f, 0.01f, 1.0f, 1.0f) };
+	XMFLOAT4 cutoffs = XMFLOAT4(20.0f, 5.0f, -10.0f, -15.0f);
+	testShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, viewMatrix, projectionMatrix, test->GetTexture(), lights, cutoffs, testColours);
+	testShader->Render(m_Direct3D->GetDeviceContext(), test->GetIndexCount());
+	//worldMatrix *= XMMatrixTranslation(25.5, 0, 0);
+	
 
-	if (blurUpdated && isHighBlur)
-	{
-		horizontalBlurShader->changeShaderBlur(true);
-		vertBlurShader->changeShaderBlur(true);
-		blurUpdated = false;
-	}
-	else
-	{
-		horizontalBlurShader->changeShaderBlur(false);
-		vertBlurShader->changeShaderBlur(false);
-		blurUpdated = false;
-	}
+	
 
-	switch (currentState)
-	{
-	case START:
-	{
-				  drawOptions(worldMatrix, baseVeiwMatrix, orthoMatrix);
-		break;	
-	}
-			
-		case MOUNTAINS:
-		{
-			if (shouldBlur)
-			{
-			
-				//renders scene to texture
-				RenderToTexture(worldMatrix, viewMatrix, projectionMatrix);
-
-				//down samples
-				downScale(worldMatrix, baseVeiwMatrix, orthoMatrix);
-
-				//Blurs horizontally
-				horizontalBlurFunction(worldMatrix, baseVeiwMatrix, orthoMatrix);
-
-				//blurs verticaly
-				vertBlurFunction(worldMatrix, baseVeiwMatrix, orthoMatrix);
-
-				//upscales to screen size
-				upScale(worldMatrix, baseVeiwMatrix, orthoMatrix);
-
-				//draws finished image
-				drawBlur(worldMatrix, baseVeiwMatrix, orthoMatrix);
-			}
-			else if (currentFilter != NONE)
-			{
-				//renders scene to texture
-				RenderToTexture(worldMatrix, viewMatrix, projectionMatrix);
-				applyFilter(worldMatrix, baseVeiwMatrix, orthoMatrix);
-				
-			}
-			else
-			{
-				renderMountians(worldMatrix, viewMatrix, projectionMatrix);
-			}
-		
-			break;
-		}
-
-		case LIGHTING:
-		{
-			break;
-		}
-	}
-
-	if (showOptions)
-	{
-		drawOptions(worldMatrix, baseVeiwMatrix, orthoMatrix);
-	}
+	worldMatrix = tempWorld;
 	m_Direct3D->EndScene();
 	return true;
 }
 
 
-void Project::drawOptions(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
+void Project::HandleInput(float frameTime)
 {
-	m_Direct3D->TurnZBufferOff();
-	optionsMenu->SendData(m_Direct3D->GetDeviceContext());
-
-	textureShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, optionsMenu->GetTexture());
-
-	textureShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-	m_Direct3D->TurnZBufferOn();
-}
-
-void Project::RenderToTexture(const XMMATRIX & worldMatrix, const XMMATRIX & viewMatrix, const XMMATRIX & projectionMatrix)
-{
-	//Set render target to texture
-	initialScene->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-	//Clear the render to texture
-	initialScene->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-	//make sure cameraposition is updated
-	m_Camera->Update();
-
-	renderMountians(worldMatrix, viewMatrix, projectionMatrix);
-
-	m_Direct3D->SetBackBufferRenderTarget();
-}
-
-void Project::renderMountians(const XMMATRIX & worldMatrix, const XMMATRIX & viewMatrix, const XMMATRIX & projectionMatrix)
-{
-	XMMATRIX startWorld = worldMatrix;
-	XMMATRIX scaledMatrix = worldMatrix;
-	// Send geometry data (from mesh)
-	terrainMesh->SendData(m_Direct3D->GetDeviceContext());
-
-	//scaling tesselated object
-	scaledMatrix = worldMatrix * XMMatrixScaling(10, 10, 10) * XMMatrixRotationRollPitchYaw(PI / 2, 0, 0);
-
-	testAlationShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), scaledMatrix, viewMatrix, projectionMatrix, terrainMesh->GetTexture(), terrainMesh->getDisplacement(), tesselationFactor);
-	// Present the rendered scene to the screen.
-	testAlationShader->Render(m_Direct3D->GetDeviceContext(), terrainMesh->GetIndexCount());
-	scaledMatrix = startWorld;
-}
-
-void renderLightingTest(const XMMATRIX & worldMatrix, const XMMATRIX & viewMatrix, const XMMATRIX & projectionMatrix)
-{
-
-}
+// Set the frame time for calculating the updated position.
+m_Camera->SetFrameTime(frameTime);
 
 
-void Project::downScale(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
-{
-	//Set render target to texture
-	downSample->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-	//Clear the render to texture
-	downSample->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-	//make sure cameraposition is updated
-	m_Camera->Update();
-
-	//draws an ortho mesh with initial scenes stored texture
-	postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-	textureShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, initialScene->GetShaderResourceView());
-
-	textureShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-
-	m_Direct3D->SetBackBufferRenderTarget();
-}
-
-void Project::horizontalBlurFunction(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
-{
-	//Set render target to texture
-	horizBlur->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-	//Clear the render to texture
-	horizBlur->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-	//make sure cameraposition is updated
-	m_Camera->Update();
-
-	//draws an ortho mesh with downScales scenes stored texture
-	postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-	horizontalBlurShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, downSample->GetShaderResourceView(), screenWidth/2);
-
-	horizontalBlurShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-
-	m_Direct3D->SetBackBufferRenderTarget();
-}
-
-void Project::vertBlurFunction(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
-{
-	//Set render target to texture
-	vertBlur->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-	//Clear the render to texture
-	vertBlur->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-	//make sure cameraposition is updated
-	m_Camera->Update();
-
-	//draws an ortho mesh with horizBlur  stored texture
-	postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-	vertBlurShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, horizBlur->GetShaderResourceView(), screenHeight/2);
-
-	vertBlurShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-
-	m_Direct3D->SetBackBufferRenderTarget();
-}
-
-void Project::upScale(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
-{
-	//Set render target to texture
-	upSample->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-	//Clear the render to texture
-	upSample->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-	//draws an ortho mesh with vert blur scenes stored texture
-	postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-	textureShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, vertBlur->GetShaderResourceView());
-
-	textureShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-
-	m_Direct3D->SetBackBufferRenderTarget();
-}
-
-void Project::drawBlur(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
-{
-	
-	if (currentFilter != NONE)
+	// Handle the input.
+	if (m_Input->isKeyDown('L'))
 	{
-		//Set render target to texture
-		initialScene->SetRenderTarget(m_Direct3D->GetDeviceContext());
-
-		//Clear the render to texture
-		initialScene->ClearRenderTarget(m_Direct3D->GetDeviceContext(), 0.0f, 0.0f, 0.0f, 1.0f);
-
-		//draws an ortho mesh with vert blur scenes stored texture
-		postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-		textureShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, vertBlur->GetShaderResourceView());
-
-		textureShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-
-		m_Direct3D->SetBackBufferRenderTarget();
-
-		applyFilter(worldMatrix, baseVeiwMatrix, orthoMatrix);
+		if (lockMovement)
+		{
+			lockMovement = false;
+		}
+		else
+		{
+			lockMovement = true;
+		}
+		m_Input->SetKeyUp('L');
 	}
-	else
+	if (m_Input->isKeyDown('W'))
 	{
-		//draws an ortho mesh with vert blur scenes stored texture
-		postProcess->SendData(m_Direct3D->GetDeviceContext());
-
-		textureShader->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, vertBlur->GetShaderResourceView());
-
-		textureShader->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
+		// forward
+		m_Camera->MoveForward();
 	}
-	
+	if (m_Input->isKeyDown('S'))
+	{
+		// back
+		m_Camera->MoveBackward();
+	}
+	if (m_Input->isKeyDown('A'))
+	{
+		// Strafe Left
+		m_Camera->StrafeLeft();
+	}
+	if (m_Input->isKeyDown('D'))
+	{
+		// Strafe Right
+		m_Camera->StrafeRight();
+	}
+	if (m_Input->isKeyDown('Q') && !lockMovement)
+	{
+		// Down
+		m_Camera->MoveDownward();
+	}
+	if (m_Input->isKeyDown('E') && !lockMovement)
+	{
+		// Up
+		m_Camera->MoveUpward();
+	}
+	if (m_Input->isKeyDown(VK_UP))
+	{
+		// rotate up
+		m_Camera->TurnUp();
+	}
+	if (m_Input->isKeyDown(VK_DOWN))
+	{
+		// rotate down
+		m_Camera->TurnDown();
+	}
+	if (m_Input->isKeyDown(VK_LEFT))
+	{
+		// rotate left
+		m_Camera->TurnLeft();
+	}
+	if (m_Input->isKeyDown(VK_RIGHT))
+	{
+		// rotate right
+		m_Camera->TurnRight();
+	}
 
+	//turns on wireframe
+	if (m_Input->isKeyDown('H'))
+	{
+		m_Direct3D->TurnOnWireframe();
+	}
+
+	//turns on wireframe
+	if (m_Input->isKeyDown('J'))
+	{
+		m_Direct3D->TurnOffWireframe();
+	}
+
+
+//alt mouse controls for camera, small offset to avoid jittering with small mousemovements
+	if (m_Input->getMouseX() < (screenRect.right / 2) - MOUSE_DEADZONE)
+	{
+		m_Camera->TurnLeft();
+	}
+
+	if (m_Input->getMouseX() > (screenRect.right / 2) + MOUSE_DEADZONE)
+	{
+		m_Camera->TurnRight();
+	}
+
+	if (m_Input->getMouseY() < (screenRect.bottom / 2) - MOUSE_DEADZONE)
+	{
+		m_Camera->TurnUp();
+	}
+
+	if (m_Input->getMouseY() > (screenRect.bottom / 2) + MOUSE_DEADZONE)
+	{
+		m_Camera->TurnDown();
+	}
+
+		
+	SetCursorPos(windowRect.right - screenRect.right/2, windowRect.bottom - screenRect.bottom /2);
 }
 
-void Project::applyFilter(const XMMATRIX & worldMatrix, const XMMATRIX & baseVeiwMatrix, const XMMATRIX & orthoMatrix)
+bool Project::triRayIntesection(XMFLOAT3 vertOne, XMFLOAT3 vertTwo, XMFLOAT3 vertThree, XMFLOAT3 camPos, XMFLOAT3 forwardVector)
 {
-	postProcess->SendData(m_Direct3D->GetDeviceContext());
-	switch (currentFilter)
-	{
-	case NONE:
-		break;
-	case GREYSCALE:
-		greyScaleFilter->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, initialScene->GetShaderResourceView());
-
-		greyScaleFilter->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-		break;
-	case NO_RED:
-		redFilter->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, initialScene->GetShaderResourceView());
-		redFilter->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-		break;
-	case NO_GREEN:
-		greenFilter->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, initialScene->GetShaderResourceView());
-		greenFilter->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-		break;
-	case NO_BLUE:
-		blueFilter->SetShaderParameters(m_Direct3D->GetDeviceContext(), worldMatrix, baseVeiwMatrix, orthoMatrix, initialScene->GetShaderResourceView());
-		blueFilter->Render(m_Direct3D->GetDeviceContext(), optionsMenu->GetIndexCount());
-		break;
-	}
-	
-
+	//make two vectors to describe triangle
+	XMFLOAT3 vectorOne = XMFLOAT3(vertTwo.x - vertOne.x, vertTwo.y - vertOne.y, vertTwo.z - vertOne.z);
+	XMFLOAT3 vectorTwo = XMFLOAT3(vertThree.x - vertOne.x, vertThree.y - vertOne.y, vertThree.z - vertOne.z);
 }

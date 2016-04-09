@@ -1,5 +1,6 @@
 // BaseApplication.cpp
 // Base application functionality for inheritnace.
+//based on Dr Paul Robertsons BaseApplication provided for Shaders module.
 #include "BaseApplication.h"
 
 
@@ -19,15 +20,13 @@ BaseApplication::BaseApplication(HINSTANCE hinstance, HWND hwnd, int screenWidth
 	// Create the camera object.
 	m_Camera = new Camera();
 	// Initialize a base view matrix with the camera for 2D user interface rendering.
-	m_Camera->SetPosition(0.0f, 0.0f, -10.0f);
+	m_Camera->SetPosition(2.0f, 5.0f, -10.0f);
 	m_Camera->Update();
 	
 	// Create the timer object.
 	m_Timer = new Timer();
 
-	//sets initial state
-	currentState = START;
-	currentFilter = NONE;
+	
 
 	//defaults show options to false
 	showOptions = false;
@@ -81,51 +80,15 @@ bool BaseApplication::Frame()
 		return false;
 	}
 
-	// Update the system stats.
-	m_Timer->Frame();
-
-	// Do the frame input processing.
-	HandleInput(m_Timer->GetTime());
-
+	
 	return true;
 }
-
 
 void BaseApplication::HandleInput(float frameTime)
 {
 	// Set the frame time for calculating the updated position.
 	m_Camera->SetFrameTime(frameTime);
 
-	//cycles between colour filters
-	if (m_Input->isKeyDown(VK_TAB))
-	{
-		switch (currentFilter)
-		{
-		case NONE:
-			currentFilter = GREYSCALE;
-			m_Input->SetKeyUp(VK_TAB);
-			break;
-		case GREYSCALE:
-			currentFilter = NO_RED;
-			m_Input->SetKeyUp(VK_TAB);
-			break;
-		case NO_RED:
-			currentFilter = NO_GREEN;
-			m_Input->SetKeyUp(VK_TAB);
-			break;
-		case NO_GREEN:
-			currentFilter = NO_BLUE;
-			m_Input->SetKeyUp(VK_TAB);
-			break;
-		case NO_BLUE:
-			currentFilter = NONE;
-			m_Input->SetKeyUp(VK_TAB);
-			break;
-		default:
-			break;
-		}
-		
-	}
 
 	//turns menu on or off
 	if (m_Input->isKeyDown('M'))
@@ -162,21 +125,8 @@ void BaseApplication::HandleInput(float frameTime)
 		}
 		m_Input->SetKeyUp('B');
 	}
-	//changes game state
-	if (m_Input->isKeyDown('1'))
-	{
-		// Mountains
-		currentState = MOUNTAINS;
-		setCamera(MOUNTAINS);
-	}
 
-	if (m_Input->isKeyDown('2'))
-	{
-		// Mountains
-		currentState = LIGHTING;
-		setCamera(LIGHTING);
-	}
-	
+
 	// Handle the input.
 	if (m_Input->isKeyDown('W'))
 	{
@@ -254,10 +204,8 @@ void BaseApplication::HandleInput(float frameTime)
 		{
 			tesselationFactor += 0.1;
 		}
-		
-	}
 
-	
+	}
 
 	//alt mouse controls for camera, small offset to avoid jittering with small mousemovements
 	if (m_Input->getMouseX() < (screenRect.right / 2) - MOUSE_DEADZONE)
@@ -280,21 +228,6 @@ void BaseApplication::HandleInput(float frameTime)
 		m_Camera->TurnDown();
 	}
 
-	SetCursorPos(windowRect.right - screenRect.right/2, windowRect.bottom - screenRect.bottom /2);
+	SetCursorPos(windowRect.right - screenRect.right / 2, windowRect.bottom - screenRect.bottom / 2);
 }
 
-void BaseApplication::setCamera(DisplayState newState)
-{
-	switch (newState)
-	{
-	case MOUNTAINS:
-		m_Camera->SetPosition(5, 5, -15);
-		m_Camera->SetRotation(40, 0, 0);
-		m_Camera->Update();
-		break;
-	case LIGHTING:
-		break;
-	default:
-		break;
-	}
-}

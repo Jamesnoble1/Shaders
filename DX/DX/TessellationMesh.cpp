@@ -63,10 +63,10 @@ void TessellationMesh::InitBuffers(ID3D11Device* device)
 	vertices[3].normal = XMFLOAT3(0.0f, 1.0f, -1.0f);
 
 	// Load the index array with data.
-	indices[0] = 0;  // Top/
-	indices[1] = 1;  // Bottom left.
-	indices[2] = 3;  // Bottom right.
-	indices[3] = 2;  // Bottom right.
+	indices[0] = 0;  
+	indices[1] = 1;  
+	indices[2] = 3;  
+	indices[3] = 2;  
 	
 
 	// Set up the description of the static vertex buffer.
