@@ -18,10 +18,13 @@ cbuffer LightBuffer : register(cb0)
 };
  
 //buffer to hold values for colour passed in. Allows multple pallets and changing cutoffs
+//num values only uses .x rest is for padding
 cbuffer colouringBuffer: register(cb1)
 {
-	float4 levelColours[4];
-	float4 levelCutoffs;
+	float4 levelColours[16];
+	float4 numValues;
+	float4 levelCutoffs[16];
+	
 };
 
 struct InputType
@@ -37,30 +40,29 @@ struct InputType
 float4 calculateColour(float yValue)
 {
 	float4 colour;
-	if (yValue >= levelCutoffs.x)
+
+	//first
+	if (yValue >= levelCutoffs[0].x)
 	{
 		colour = levelColours[0];
 	}
-	else if (yValue >= levelCutoffs.y && yValue < levelCutoffs.x)
+
+	//the ones inbetween
+	for (int i = 1; i < (int(numValues.x) ); i++)
 	{
-		//lerp between two colours
-		colour = lerp(levelColours[1], levelColours[0], (yValue - levelCutoffs.y) / (levelCutoffs.x - levelCutoffs.y));
-	}
-	else if (yValue >= levelCutoffs.z && yValue <= levelCutoffs.y)
-	{
-		//lerp
-		colour = lerp(levelColours[2], levelColours[1], (yValue - levelCutoffs.z) / (levelCutoffs.y - levelCutoffs.z));
-	}
-	else if (yValue >= levelCutoffs.w && yValue <= levelCutoffs.z)
-	{
-		//lerp
-		colour = lerp(levelColours[3], levelColours[2], (yValue - levelCutoffs.w) / (levelCutoffs.z - levelCutoffs.w));
-	}
-	else
-	{
-		colour = levelColours[3];
+		if (yValue >= levelCutoffs[i].x && yValue <= levelCutoffs[i-1].x)
+		{
+			//lerp between two colours
+			colour = lerp(levelColours[i], levelColours[i - 1], (yValue - levelCutoffs[i]) / (levelCutoffs[i - 1] - levelCutoffs[i]));
+		}
 	}
 
+	//last
+	if (yValue <= levelCutoffs[int(numValues.x) - 1].x)
+	{
+		colour = levelColours[int(numValues.x) - 1];
+	}
+	
 	return colour;
 }
 
@@ -75,7 +77,7 @@ float4 main(InputType input) : SV_TARGET
 	float distance;
 
 	//constants for attenuation. May have these controlable by user
-	float maxDistance = 50.0f;
+	float maxDistance = 100.0f;
 	float constantFactor = 1.0f;
 	float linearFactor = 0.125f;
 	float quadratciFactor = 0.0f;

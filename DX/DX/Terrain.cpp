@@ -4,7 +4,7 @@
 //based on Dr Paul Roebertson's PlaneMesh.cpp
 #include "Terrain.h"
 
-Terrain::Terrain(ID3D11Device* device, WCHAR* textureFilename, float ** terrainArray, int arraySize)
+Terrain::Terrain(ID3D11Device* device,  float ** terrainArray, int arraySize)
 {
 	//m_arraySzie is the size of the array to store into the buffer
 	m_arraySize = arraySize;
@@ -15,8 +15,7 @@ Terrain::Terrain(ID3D11Device* device, WCHAR* textureFilename, float ** terrainA
 	// Initialize the vertex and index buffer that hold the geometry Terrain.
 	InitBuffers(device);
 
-	// Load the texture for this model.
-	LoadTexture(device, textureFilename);
+	
 	
 }
 

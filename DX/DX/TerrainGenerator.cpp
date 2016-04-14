@@ -4,6 +4,7 @@ TerrainGenerator::TerrainGenerator(int sizeN, float smoothingMod)
 {
 	//sets class member variables
 	m_sizeN = sizeN;
+	isTilable = false;
 	m_resolution = pow(2, sizeN) + 1;
 	m_smoothingMod = smoothingMod;
 	smoothingMultiplier = pow(2, -smoothingMod);
@@ -14,6 +15,12 @@ TerrainGenerator::TerrainGenerator(int sizeN, float smoothingMod)
 		terrainArray[i] = new float[m_resolution];
 	}
 
+	//creates collision mesh array
+	collisionArray = new float *[(m_resolution/4)];
+	for (int i = 0; i < (m_resolution /4); i++)
+	{
+		collisionArray[i] = new float[(m_resolution/4)];
+	}
 	//seeds rand
 	srand(std::chrono::steady_clock::now().time_since_epoch().count());
 }
@@ -27,17 +34,35 @@ TerrainGenerator::~TerrainGenerator()
 	}
 
 	delete terrainArray;
+
+	//delete collision array
+	for (int i = 0; i < (m_resolution / 4); i++)
+	{
+		collisionArray[i] = new float[(m_resolution / 4)];
+	}
+	delete collisionArray;
 }
+
+
 
 float ** TerrainGenerator::getTerrain()
 {
 	return terrainArray;
 }
 
+float ** TerrainGenerator::getCollision()
+{
+	return collisionArray;
+}
 
 int TerrainGenerator::getArraySize()
 {
 	return m_resolution;
+}
+
+void TerrainGenerator::setTilable(bool tile)
+{
+	isTilable = tile;
 }
 
 //main function to calculate the terrain
@@ -48,7 +73,7 @@ void TerrainGenerator::calculateTerrain(float topLeft, float topRight, float bot
 	{
 		for (int j = 0; j < m_resolution; j++)
 		{
-			terrainArray[i][j] = -10.0f;
+			terrainArray[i][j] = -100.0f;
 		}
 	}
 
@@ -100,18 +125,17 @@ void TerrainGenerator::calculateTerrain(float topLeft, float topRight, float bot
 
 	squarePoints.clear();
 	diamondPoints.clear();
+
+
+	fillCollisionArray();
 }
 
 //does the square step using the points generated in triangle step as it's root
 // calculate value for all four points stride distance away from rootLocation on x and y directions
 //to do this take average of 4 points stride distance away from this point and add a small random varience
-//if any points needed go off the end of the array wrap around and use far side values
 //Only calculates value if no value has been calculated previously
 void TerrainGenerator::squareStep(int stride, Location rootLocation)
 {
-
-	float pos = 0.0;
-
 
 	//Checks point to the negative x
 	if ((rootLocation.x - (stride * 2)) < 0 && terrainArray[rootLocation.x - stride][rootLocation.y] < -9.0f)
@@ -121,7 +145,9 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 			//terrainArray[(m_resolution - 1) - stride][rootLocation.y] +
 			terrainArray[rootLocation.x - stride][rootLocation.y + stride] +
 			terrainArray[rootLocation.x - stride][rootLocation.y - stride]) / 3 + randomOffset();
-		pos = terrainArray[rootLocation.x - stride][rootLocation.y];
+		
+		
+		
 		//pushes to vector
 		pushSquarePoints(rootLocation.x - stride, rootLocation.y);
 	}
@@ -132,7 +158,7 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 			terrainArray[rootLocation.x - (stride * 2)][rootLocation.y] +
 			terrainArray[rootLocation.x - stride][rootLocation.y + stride] +
 			terrainArray[rootLocation.x - stride][rootLocation.y - stride]) / 4 + randomOffset();
-		pos = terrainArray[rootLocation.x - stride][rootLocation.y];
+		
 		//pushes to vector
 		pushSquarePoints(rootLocation.x - stride, rootLocation.y);
 	}
@@ -141,12 +167,15 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 	if ((rootLocation.x + (stride * 2)) > (m_resolution - 1) && terrainArray[rootLocation.x + stride][rootLocation.y] < -9.0f)
 	{
 		//point goes off right side
-		terrainArray[rootLocation.x + stride][rootLocation.y] = (terrainArray[rootLocation.x][rootLocation.y] +
-			//terrainArray[stride][rootLocation.y] +
-			terrainArray[rootLocation.x + stride][rootLocation.y + stride] +
-			terrainArray[rootLocation.x + stride][rootLocation.y - stride]) / 3 + randomOffset();
+		//if (!isTilable || (rootLocation.x + stride) != (m_resolution -1))
+		{
+			terrainArray[rootLocation.x + stride][rootLocation.y] = (terrainArray[rootLocation.x][rootLocation.y] +
+				terrainArray[rootLocation.x + stride][rootLocation.y + stride] +
+				terrainArray[rootLocation.x + stride][rootLocation.y - stride]) / 3 + randomOffset();
+		}
+		
 
-		pos = terrainArray[rootLocation.x + stride][rootLocation.y];
+
 		//pushes to vector
 		pushSquarePoints(rootLocation.x + stride, rootLocation.y);
 	}
@@ -157,7 +186,7 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 			terrainArray[rootLocation.x + (stride * 2)][rootLocation.y] +
 			terrainArray[rootLocation.x + stride][rootLocation.y + stride] +
 			terrainArray[rootLocation.x + stride][rootLocation.y - stride]) / 4 + randomOffset();
-		pos = terrainArray[rootLocation.x + stride][rootLocation.y];
+		
 		//pushes to vector
 		pushSquarePoints(rootLocation.x + stride, rootLocation.y);
 	}
@@ -171,9 +200,9 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 			//terrainArray[rootLocation.x][(m_resolution - 1) - stride] +
 			terrainArray[rootLocation.x + stride][rootLocation.y - stride] +
 			terrainArray[rootLocation.x - stride][rootLocation.y - stride]) / 3 + randomOffset();
-		//pushes to vector
-		pos =
-			terrainArray[rootLocation.x][rootLocation.y - stride];
+		
+		
+		
 		pushSquarePoints(rootLocation.x, rootLocation.y - stride);
 	}
 	else if (terrainArray[rootLocation.x][rootLocation.y - stride] < -9.0f)
@@ -184,21 +213,22 @@ void TerrainGenerator::squareStep(int stride, Location rootLocation)
 			terrainArray[rootLocation.x + stride][rootLocation.y - stride] +
 			terrainArray[rootLocation.x - stride][rootLocation.y - stride]) / 4 + randomOffset();
 		//pushes to vector
-		pos = terrainArray[rootLocation.x][rootLocation.y - stride];
+		
 		pushSquarePoints(rootLocation.x, rootLocation.y - stride);
 	}
 
 	//checks point on positive y
 	if ((rootLocation.y + (stride * 2)) > (m_resolution - 1) && terrainArray[rootLocation.x][rootLocation.y + stride] < -9.0f)
 	{
-		//point goes off bottom of array
+
 		terrainArray[rootLocation.x][rootLocation.y + stride] = (terrainArray[rootLocation.x][rootLocation.y] +
-			//terrainArray[rootLocation.x][stride] +
 			terrainArray[rootLocation.x - stride][rootLocation.y + stride] +
 			terrainArray[rootLocation.x + stride][rootLocation.y + stride]) / 3 + randomOffset();
+
+
 		//pushes to vector
-		pos = terrainArray[rootLocation.x][rootLocation.y - stride];
 		pushSquarePoints(rootLocation.x, rootLocation.y + stride);
+	
 	}
 	else if (terrainArray[rootLocation.x][rootLocation.y + stride] < -9.0f)
 	{
@@ -268,7 +298,7 @@ void TerrainGenerator::triangleStep(int stride, Location rootLocation)
 				terrainArray[rootLocation.x - (stride * 2)][rootLocation.y + (stride * 2)] +
 				terrainArray[rootLocation.x - (stride * 2)][rootLocation.y]) / 4 + randomOffset();
 
-
+			
 			loc.x = rootLocation.x - stride;
 			loc.y = rootLocation.y + stride;
 			diamondPoints.push_back(loc);
@@ -288,7 +318,8 @@ void TerrainGenerator::triangleStep(int stride, Location rootLocation)
 				terrainArray[rootLocation.x + (stride * 2)][rootLocation.y - (stride * 2)] +
 				terrainArray[rootLocation.x + (stride * 2)][rootLocation.y]) / 4 + randomOffset();
 			//+ (float)(rand() % 1);
-
+ 
+		
 			loc.x = rootLocation.x + stride;
 			loc.y = rootLocation.y - stride;
 			diamondPoints.push_back(loc);
@@ -317,3 +348,14 @@ void TerrainGenerator::triangleStep(int stride, Location rootLocation)
 	}
 }
 
+//fills the collision array using data from the terrain array
+void TerrainGenerator::fillCollisionArray()
+{
+	for (int i = 0; i < (m_resolution / 4); i++)
+	{
+		for (int j = 0; j < (m_resolution / 4); j++)
+		{
+			collisionArray[i][j] = terrainArray[i * 4][j * 4];
+		}
+	}
+}

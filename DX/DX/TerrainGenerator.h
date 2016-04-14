@@ -22,6 +22,8 @@ public:
 	~TerrainGenerator();
 	void calculateTerrain(float topLeft, float topRight, float bottomLeft, float bottomRight);
 	float ** getTerrain();
+	float ** getCollision();
+	void setTilable(bool tile);
 	int getArraySize();
 
 private:
@@ -29,9 +31,12 @@ private:
 	int m_sizeN;
 	float m_smoothingMod;
 	float smoothingMultiplier;
+	bool isTilable;
 	float ** terrainArray;
+	float ** collisionArray;
 	void triangleStep(int stride, Location rootLocation);
 	void squareStep(int stride, Location rootLocation);
+	void fillCollisionArray();
 	vector<Location> diamondPoints, squarePoints;
 	float randomOffset();
 	void pushSquarePoints(int x, int y);

@@ -15,7 +15,7 @@ class Terrain : public BaseMesh
 
 public:
 	
-	Terrain(ID3D11Device* device, WCHAR* textureFilename, float ** terrainArray, int arraySize);
+	Terrain(ID3D11Device* device, float ** terrainArray, int arraySize);
 	~Terrain();
 	
 

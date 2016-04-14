@@ -113,7 +113,7 @@ void LightShader::InitShader(WCHAR* vsFilename, WCHAR* psFilename)
 
 
 void LightShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const XMMATRIX &worldMatrix, const XMMATRIX &viewMatrix, const XMMATRIX &projectionMatrix,
-									  ID3D11ShaderResourceView* texture, vector<Light*> light, XMFLOAT4 cutoffs, XMFLOAT4* colourValues)
+									  vector<Light*> light, float* cutoffs, XMFLOAT4* colourValues, int numValues)
 {
 	HRESULT result;
 	D3D11_MAPPED_SUBRESOURCE mappedResource;
@@ -186,18 +186,35 @@ void LightShader::SetShaderParameters(ID3D11DeviceContext* deviceContext, const 
 	deviceContext->Map(m_colourBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mappedResource);
 	colourPtr = (colourBufferType*)mappedResource.pData;
 
-	colourPtr->lightCutoffs = cutoffs;
-	colourPtr->lightColours[0] = colourValues[0];
-	colourPtr->lightColours[1] = colourValues[1];
-	colourPtr->lightColours[2] = colourValues[2];
-	colourPtr->lightColours[3] = colourValues[3];
+	//fills arrays with 0s
+	for (int i = 0; i < numValues; i++)
+	{
+		colourPtr->lightCutoffs[i] = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+		colourPtr->lightColours[i] = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+	}
+	colourPtr->numValues = XMFLOAT4(0.0f, 0.0f, 0.0f, 0.0f);
+
+	//ensures num values can't go outside array
+	if (numValues <= 16)
+	{
+		//sets used array elements
+		for (int i = 0; i < numValues; i++)
+		{
+			colourPtr->lightCutoffs[i] = XMFLOAT4(cutoffs[i], cutoffs[i], cutoffs[i], cutoffs[i]);
+			colourPtr->lightColours[i] = colourValues[i];
+			
+		}
+		colourPtr->numValues = XMFLOAT4(numValues, numValues, numValues, numValues);
+	}
+	
+	
+	
 	
 	deviceContext->Unmap(m_colourBuffer, 0);
 
 	deviceContext->PSSetConstantBuffers(bufferNumber, 1, &m_colourBuffer);
 	
-	// Set shader texture resource in the pixel shader.
-	deviceContext->PSSetShaderResources(0, 1, &texture);
+	
 }
 
 void LightShader::Render(ID3D11DeviceContext* deviceContext, int indexCount)
