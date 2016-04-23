@@ -36,7 +36,7 @@ Project::Project(HINSTANCE hinstance, HWND hwnd, int screenWidth, int screenHeig
 	menuMesh = new OrthoMesh(m_Direct3D->GetDevice(), 300, 300, 0, 0);
 	ditherTest = new DitheringShader(m_Direct3D->GetDevice(), hwnd);
 	renderMenu = new TextureShader(m_Direct3D->GetDevice(), hwnd);
-	menuTexture = new Texture(m_Direct3D->GetDevice(), L"../res/options.png");
+	menuTexture = new Texture(m_Direct3D->GetDevice(), L"../res/menu.png");
 
 	terrainManager = new TerrainManager(m_Direct3D, hwnd);
 	
